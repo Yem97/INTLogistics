@@ -1,0 +1,142 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  BUYER
+  ADMIN
+}
+
+enum PetStatus {
+  AVAILABLE
+  RESERVED
+  SOLD
+}
+
+enum ShipmentStatus {
+  ORDER_PLACED
+  PREPARING
+  PICKED_UP
+  IN_TRANSIT
+  OUT_FOR_DELIVERY
+  DELIVERED
+  ON_HOLD
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  password      String
+  role          Role      @default(BUYER)
+  phone         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  orders        Order[]
+  sentMessages  Message[] @relation("SentMessages")
+  sessions      Session[]
+  accounts      Account[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Pet {
+  id          String    @id @default(cuid())
+  name        String
+  breed       String
+  species     String
+  age         String
+  gender      String
+  color       String
+  price       Float
+  description String    @db.Text
+  status      PetStatus @default(AVAILABLE)
+  images      String[]
+  healthDocs  String[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  orders Order[]
+}
+
+model Order {
+  id                  String    @id @default(cuid())
+  trackingNumber      String    @unique @default(cuid())
+  buyerId             String
+  petId               String
+  originState         String
+  destinationState    String
+  estimatedArrival    DateTime?
+  specialInstructions String?   @db.Text
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  buyer    User            @relation(fields: [buyerId], references: [id])
+  pet      Pet             @relation(fields: [petId], references: [id])
+  events   ShipmentEvent[]
+  messages Message[]
+}
+
+model ShipmentEvent {
+  id          String         @id @default(cuid())
+  orderId     String
+  status      ShipmentStatus
+  location    String
+  description String
+  timestamp   DateTime       @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  orderId   String
+  senderId  String
+  content   String   @db.Text
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  order  Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  sender User  @relation("SentMessages", fields: [senderId], references: [id])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  orderId   String?
+  title     String
+  message   String   @db.Text
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
